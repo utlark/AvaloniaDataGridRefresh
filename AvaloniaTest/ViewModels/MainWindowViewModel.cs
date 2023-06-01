@@ -1,8 +1,9 @@
 ﻿using System;
-using System.Collections.Generic;
 using System.Collections.ObjectModel;
+using System.ComponentModel;
 using System.Diagnostics.CodeAnalysis;
 using System.Reactive.Linq;
+using System.Runtime.CompilerServices;
 using System.Timers;
 using Avalonia.Threading;
 
@@ -11,8 +12,7 @@ namespace AvaloniaTest.ViewModels;
 public class MainWindowViewModel : ViewModelBase
 {
     private readonly Random _random = new();
-    private readonly RunMode _runMode = RunMode.CorrectObservableCollection;
-    private readonly Stack<Person> _stack = new();
+    private readonly RunMode _runMode = RunMode.ObservableCollectionPropertyChange;
 
     private readonly Timer _timer = new()
     {
@@ -31,16 +31,10 @@ public class MainWindowViewModel : ViewModelBase
                     case RunMode.Observable:
                         People.Add(new Person
                         {
-                            FirstName = _random.Next(1000).ToString(),
+                            FirstName = _random.Next(1000),
                             LastName = _random.Next(1000).ToString()
                         });
                         break;
-                    case RunMode.TimerTest:
-                    {
-                        if (_stack.TryPop(out var newPerson))
-                            People.Add(newPerson);
-                        break;
-                    }
                 }
             });
 
@@ -48,28 +42,35 @@ public class MainWindowViewModel : ViewModelBase
         {
             switch (_runMode)
             {
-                case RunMode.TimerTest:
-                    _stack.Push(new Person
-                    {
-                        FirstName = _random.Next(1000).ToString(),
-                        LastName = _random.Next(1000).ToString()
-                    });
-                    break;
                 case RunMode.WrongObservableCollection:
                     People.Add(new Person
                     {
-                        FirstName = _random.Next(1000).ToString(),
+                        FirstName = _random.Next(1000),
                         LastName = _random.Next(1000).ToString()
                     });
                     break;
                 case RunMode.CorrectObservableCollection:
+                case RunMode.ObservableCollectionPropertyChange:
                     Dispatcher.UIThread.InvokeAsync(() =>
                     {
                         People.Add(new Person
                         {
-                            FirstName = _random.Next(1000).ToString(),
+                            FirstName = _random.Next(1000),
                             LastName = _random.Next(1000).ToString()
                         });
+                    }, DispatcherPriority.Background);
+                    break;
+            }
+        };
+        _timer.Elapsed += (_, _) =>
+        {
+            switch (_runMode)
+            {
+                case RunMode.ObservableCollectionPropertyChange:
+                    Dispatcher.UIThread.InvokeAsync(() =>
+                    {
+                        var temp = People[0];
+                        temp.FirstName = People.Count;
                     }, DispatcherPriority.Background);
                     break;
             }
@@ -83,10 +84,35 @@ public class MainWindowViewModel : ViewModelBase
 
 #pragma warning disable CS8618
     [SuppressMessage("ReSharper", "UnusedAutoPropertyAccessor.Global")]
-    public class Person
+    public class Person : INotifyPropertyChanged
     {
-        public string FirstName { get; set; }
-        public string LastName { get; set; }
+        private int _firstName;
+        private string _lastName;
+
+        public int FirstName
+        {
+            get => _firstName;
+            set
+            {
+                _firstName = value;
+                OnPropertyChanged();
+            }
+        }
+
+        public string LastName
+        {
+            get => _lastName;
+            set
+            {
+                _lastName = value;
+                OnPropertyChanged();
+            }
+        }
+
+        public event PropertyChangedEventHandler PropertyChanged;
+
+        private void OnPropertyChanged([CallerMemberName] string prop = "") => 
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(prop));
     }
 #pragma warning restore CS8618
 
@@ -95,8 +121,8 @@ public class MainWindowViewModel : ViewModelBase
     private enum RunMode
     {
         Observable = 0,
-        TimerTest = 1,
-        WrongObservableCollection = 2,
-        CorrectObservableCollection = 3
+        WrongObservableCollection = 1,
+        CorrectObservableCollection = 2,
+        ObservableCollectionPropertyChange = 3
     }
 }
