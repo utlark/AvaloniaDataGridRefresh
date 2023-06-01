@@ -7,122 +7,125 @@ using System.Runtime.CompilerServices;
 using System.Timers;
 using Avalonia.Threading;
 
-namespace AvaloniaTest.ViewModels;
-
-public class MainWindowViewModel : ViewModelBase
+namespace AvaloniaTest.ViewModels
 {
-    private readonly Random _random = new();
-    private readonly RunMode _runMode = RunMode.ObservableCollectionPropertyChange;
-
-    private readonly Timer _timer = new()
+    public class MainWindowViewModel : ViewModelBase
     {
-        Interval = 500,
-        AutoReset = true
-    };
+        public MainWindowViewModel()
+        {
+            Observable.Interval(TimeSpan.FromSeconds(1))
+                      .ObserveOn(AvaloniaScheduler.Instance)
+                      .Subscribe(_ =>
+                       {
+                           switch (_runMode)
+                           {
+                               case RunMode.Observable:
+                                   People.Add(new Person
+                                   {
+                                       FirstName = _random.Next(1000),
+                                       LastName  = _random.Next(1000).ToString()
+                                   });
+                                   break;
+                           }
+                       });
 
-    public MainWindowViewModel()
-    {
-        Observable.Interval(TimeSpan.FromSeconds(1))
-            .ObserveOn(AvaloniaScheduler.Instance)
-            .Subscribe(_ =>
+            _timer.Elapsed += (_, _) =>
             {
                 switch (_runMode)
                 {
-                    case RunMode.Observable:
+                    case RunMode.WrongObservableCollection:
                         People.Add(new Person
                         {
                             FirstName = _random.Next(1000),
-                            LastName = _random.Next(1000).ToString()
+                            LastName  = _random.Next(1000).ToString()
                         });
                         break;
-                }
-            });
-
-        _timer.Elapsed += (_, _) =>
-        {
-            switch (_runMode)
-            {
-                case RunMode.WrongObservableCollection:
-                    People.Add(new Person
-                    {
-                        FirstName = _random.Next(1000),
-                        LastName = _random.Next(1000).ToString()
-                    });
-                    break;
-                case RunMode.CorrectObservableCollection:
-                case RunMode.ObservableCollectionPropertyChange:
-                    Dispatcher.UIThread.InvokeAsync(() =>
-                    {
-                        People.Add(new Person
+                    case RunMode.CorrectObservableCollection:
+                    case RunMode.ObservableCollectionPropertyChange:
+                        Dispatcher.UIThread.InvokeAsync(() =>
                         {
-                            FirstName = _random.Next(1000),
-                            LastName = _random.Next(1000).ToString()
-                        });
-                    }, DispatcherPriority.Background);
-                    break;
-            }
-        };
-        _timer.Elapsed += (_, _) =>
-        {
-            switch (_runMode)
+                            People.Add(new Person
+                            {
+                                FirstName = _random.Next(1000),
+                                LastName  = _random.Next(1000).ToString()
+                            });
+                        }, DispatcherPriority.Background);
+                        break;
+                }
+            };
+            _timer.Elapsed += (_, _) =>
             {
-                case RunMode.ObservableCollectionPropertyChange:
-                    Dispatcher.UIThread.InvokeAsync(() =>
-                    {
-                        var temp = People[0];
-                        temp.FirstName = People.Count;
-                    }, DispatcherPriority.Background);
-                    break;
-            }
-        };
-        _timer.Start();
-    }
+                switch (_runMode)
+                {
+                    case RunMode.ObservableCollectionPropertyChange:
+                        Dispatcher.UIThread.InvokeAsync(() =>
+                        {
+                            var temp = People[0];
+                            temp.FirstName = People.Count;
+                        }, DispatcherPriority.Background);
+                        break;
+                }
+            };
+            _timer.Start();
+        }
 
-    public ObservableCollection<Person> People { get; } = new();
+        public ObservableCollection<Person> People { get; } = new();
 
-    #region PersonClass
+        #region PersonClass
 
 #pragma warning disable CS8618
-    [SuppressMessage("ReSharper", "UnusedAutoPropertyAccessor.Global")]
-    public class Person : INotifyPropertyChanged
-    {
-        private int _firstName;
-        private string _lastName;
-
-        public int FirstName
+        [SuppressMessage("ReSharper", "UnusedAutoPropertyAccessor.Global")]
+        public class Person : INotifyPropertyChanged
         {
-            get => _firstName;
-            set
+            public event PropertyChangedEventHandler PropertyChanged;
+
+            public int FirstName
             {
-                _firstName = value;
-                OnPropertyChanged();
+                get => _firstName;
+                set
+                {
+                    _firstName = value;
+                    OnPropertyChanged();
+                }
             }
-        }
 
-        public string LastName
-        {
-            get => _lastName;
-            set
+            public string LastName
             {
-                _lastName = value;
-                OnPropertyChanged();
+                get => _lastName;
+                set
+                {
+                    _lastName = value;
+                    OnPropertyChanged();
+                }
             }
+
+            public Person Clone() => new() { FirstName = FirstName, LastName = LastName };
+
+            private int    _firstName;
+            private string _lastName;
+
+            private void OnPropertyChanged([CallerMemberName] string prop = "") => 
+                PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(prop));
         }
-
-        public event PropertyChangedEventHandler PropertyChanged;
-
-        private void OnPropertyChanged([CallerMemberName] string prop = "") => 
-            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(prop));
-    }
 #pragma warning restore CS8618
 
-    #endregion
+        #endregion
 
-    private enum RunMode
-    {
-        Observable = 0,
-        WrongObservableCollection = 1,
-        CorrectObservableCollection = 2,
-        ObservableCollectionPropertyChange = 3
+        private readonly Random  _random  = new();
+        private readonly RunMode _runMode = RunMode.ObservableCollectionPropertyChange;
+
+        private readonly Timer _timer = new()
+        {
+            Interval  = 500,
+            AutoReset = true
+        };
+
+        private enum RunMode
+        {
+            Observable                         = 0,
+            WrongObservableCollection          = 1,
+            CorrectObservableCollection        = 2,
+            ObservableCollectionPropertyChange = 3
+        }
     }
 }
