@@ -5,6 +5,7 @@ using System.Diagnostics.CodeAnalysis;
 using System.Reactive.Linq;
 using System.Runtime.CompilerServices;
 using System.Timers;
+using Avalonia.ReactiveUI;
 using Avalonia.Threading;
 
 namespace AvaloniaTest.ViewModels
